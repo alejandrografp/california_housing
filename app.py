@@ -15,22 +15,23 @@ import requests
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+
+# Ruta local del modelo.
 MODEL_PATH = "modelo_california.pkl"
-# URL "raw" del modelo en el repositorio de GitHub (se puede sobrescribir con la
-# variable de entorno MODEL_URL). Formato:
-# https://raw.githubusercontent.com/<usuario>/<repositorio>/main/modelo_california.pkl
 MODEL_URL = os.getenv(
     "MODEL_URL",
     "https://raw.githubusercontent.com/alejandrografp/california_housing/main/modelo_california.pkl",
 )
-DOWNLOAD_TIMEOUT = 30  # segundos
 
-# El modelo se carga al arrancar y se guarda aquí.
+DOWNLOAD_TIMEOUT = 30
+
+
+# Estado de la aplicación.
 state = {"model": None}
 
 
 class HouseFeatures(BaseModel):
-    """Variables de entrada del modelo (una zona censal)."""
+
     MedInc: float
     HouseAge: float
     AveRooms: float
@@ -41,46 +42,78 @@ class HouseFeatures(BaseModel):
     Longitude: float
 
 
-def download_model(url: str | None = None, path: str = MODEL_PATH):
-    """Descarga el modelo desde `url` (por defecto MODEL_URL) y lo guarda en `path`."""
-    url = url or MODEL_URL
+def download_model(url: str = MODEL_URL, path: str = MODEL_PATH):
+    """
+    Descarga el modelo desde GitHub y lo guarda localmente.
+    """
+
+    print(f"Descargando el modelo desde GitHub: {url}")
+
     response = requests.get(url, timeout=DOWNLOAD_TIMEOUT)
     response.raise_for_status()
-    with open(path, "wb") as f:
-        f.write(response.content)
-    print(f"Modelo descargado de {url} ({len(response.content)} bytes)")
+
+    with open(path, "wb") as file:
+        file.write(response.content)
+
+    print(f"Modelo descargado correctamente en {path}")
 
 
 def load_model(path: str = MODEL_PATH):
-    """Carga el modelo. Si no existe en local, lo descarga antes de GitHub."""
+    """
+    Carga el modelo local.
+    Si no existe, lo descarga desde GitHub antes de cargarlo.
+    """
+
     if not os.path.exists(path):
-        print(f"{path} no encontrado en local, descargando...")
-        download_model()
-    return joblib.load(path)
+        print(f"El archivo {path} no existe localmente.")
+        print("Iniciando descarga desde GitHub...")
+
+        download_model(path=path)
+
+    print("Cargando el modelo...")
+    model = joblib.load(path)
+
+    print("Modelo cargado correctamente.")
+
+    return model
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Se ejecuta una vez al arrancar el servicio."""
+    """
+    Carga el modelo al iniciar el servicio.
+    """
+
     state["model"] = load_model()
     yield
 
 
-app = FastAPI(title="Precio de casas en California", lifespan=lifespan)
+app = FastAPI(
+    title="Precio de casas en California",
+    lifespan=lifespan,
+)
 
 
 @app.get("/")
 def health():
-    """Health-check: confirma que el servicio está funcionando."""
+    """Comprueba que el servicio está funcionando."""
+
     return {"status": "ok"}
 
 
 @app.post("/predict")
 def predict(features: HouseFeatures):
-    """Devuelve el precio medio estimado (en cientos de miles de dólares)."""
+    """Predice el precio medio de una vivienda."""
+
     model = state["model"]
+
     if model is None:
-        raise HTTPException(status_code=503, detail="Modelo no cargado")
+        raise HTTPException(
+            status_code=503,
+            detail="Modelo no cargado",
+        )
+
     X = pd.DataFrame([features.model_dump()])
     prediction = model.predict(X)[0]
+
     return {"MedHouseVal": float(prediction)}
