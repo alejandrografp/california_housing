@@ -18,8 +18,7 @@ from pydantic import BaseModel
 
 # Ruta local del modelo.
 MODEL_PATH = "modelo_california.pkl"
-MODEL_URL = os.getenv(
-    "MODEL_URL",
+MODEL_URL = (
     "https://raw.githubusercontent.com/alejandrografp/california_housing/main/modelo_california.pkl",
 )
 
