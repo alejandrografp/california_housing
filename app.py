@@ -21,7 +21,7 @@ MODEL_PATH = "modelo_california.pkl"
 # https://raw.githubusercontent.com/<usuario>/<repositorio>/main/modelo_california.pkl
 MODEL_URL = os.getenv(
     "MODEL_URL",
-    "https://raw.githubusercontent.com/<usuario>/<repositorio>/main/modelo_california.pkl",
+    "https://raw.githubusercontent.com/alejandrografp/california_housing/main/modelo_california.pkl",
 )
 DOWNLOAD_TIMEOUT = 30  # segundos
 
